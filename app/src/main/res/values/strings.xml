@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Music player</string>
+    <string name="player_icon">this is player\'s default icon</string>
+</resources>
