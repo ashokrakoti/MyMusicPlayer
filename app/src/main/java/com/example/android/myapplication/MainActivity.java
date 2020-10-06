@@ -1,28 +1,33 @@
 package com.example.android.myapplication;
 
 import android.content.Context;
+import android.media.AudioAttributes;
+import android.media.AudioFocusRequest;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
+import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.Toast;
 
+import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
-
 import com.daimajia.androidanimations.library.Techniques;
 import com.daimajia.androidanimations.library.YoYo;
 
 public class MainActivity extends AppCompatActivity {
-
+    
     // Instantiating the MediaPlayer class
     private MediaPlayer music;
 
     //handles the audio focus when playing a sound file.
     private AudioManager myAudioManager ;
 
-    @Override
+    final AudioFocusRequest[] audioFocusRequest = new AudioFocusRequest[1];
+    final AudioAttributes[] audioAttributes = {null};
+
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
@@ -33,23 +38,53 @@ public class MainActivity extends AppCompatActivity {
         //initializing the audio manager object.
         myAudioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
 
-            //logic for the play functionality
+        //logic for the play functionality
+        /*
+             START -- PLAY
+             START -- PLAY
+         */
             Button startButton = findViewById(R.id.start);
-            startButton.setOnClickListener(new View.OnClickListener() {
+            startButton.setOnClickListener(new View.OnClickListener()
+            {
                 @Override
                 public void onClick(View v) {
+                    int result ;
 
-                    //requesting  the audio focus for playing the file.
-                    int result = myAudioManager.requestAudioFocus(audioFocusChangeListener,
-                            AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN);
+/////////////////////  building audio attributes to use in building a AudioFocusRequest object.
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {  //21
+                        audioAttributes[0] = new AudioAttributes.Builder()
+                                .setUsage(AudioAttributes.USAGE_MEDIA)
+                                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                                .build();
+                    }
+
+                    ///// building a AudioFocusRequest object to use for requesting audio focus.
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {  //26
+                        audioFocusRequest[0] = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+                                .setOnAudioFocusChangeListener(audioFocusChangeListener)
+                                .setAudioAttributes(audioAttributes[0])
+                                .setAcceptsDelayedFocusGain(false)
+                                .setWillPauseWhenDucked(true)
+                                .build();
+
+                        //requesting  the audio focus for playing the file.
+                        result = myAudioManager.requestAudioFocus(audioFocusRequest[0]);
+                    }
+                    else {
+
+                        //requesting  the audio focus for playing the file.
+                        result = myAudioManager.requestAudioFocus(audioFocusChangeListener,
+                                AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN);
+                    }
                     if(result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED){
                         Log.i("musicplayer -start", "focus gained");
                         //checking for any media player already playing.
                         //clearing the player already if one exists.
                         if(music!= null && music.isPlaying()){
-                            releaseMediaPlayer();
+                            Log.i("musicplayer", "already playing a track");
+                            Toast.makeText(getApplicationContext(), "song already playing", Toast.LENGTH_SHORT).show();
                         }
-                        if(music!=null){
+                        if(music!=null && !music.isPlaying()){//checking if a song is already playing or not.
                             music.start();
                             Log.i("music player ", "playback started");
                             Toast.makeText(getBaseContext(), "started music player", Toast.LENGTH_SHORT).show();
@@ -60,24 +95,28 @@ public class MainActivity extends AppCompatActivity {
                                     .playOn(findViewById(R.id.start));
 
                             //setting to display message after the media player is done playing the audio file.
-                           /* music.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
+                            music.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
                                 @Override
                                 public void onCompletion(MediaPlayer mp) {
+                                    mp.reset();
                                     releaseMediaPlayer();
                                     Log.i("music player", "music playback completed stopping player and releasing res.");
                                     Toast.makeText(getApplicationContext(), "Released  media player resources", Toast.LENGTH_SHORT).show();
                                 }
-                            });//end of onCompletionListener*/
-                        }else {
-                            Log.i("musicplayer", "OOPS !!!!!  music player object is a null ");
+                            });//end of onCompletionListener
                         }
                     }
                 }
             });//end of onClickListener for start Button.
 
             //logic for the pause functionality
+           /*
+                    PAUSE
+                    PAUSE
+            */
             Button pauseButton = findViewById(R.id.pause);
-            pauseButton.setOnClickListener(new View.OnClickListener() {
+            pauseButton.setOnClickListener(new View.OnClickListener()
+            {
                 @Override
                 public void onClick(View v) {
                     if(music!= null && music.isPlaying()){
@@ -87,7 +126,10 @@ public class MainActivity extends AppCompatActivity {
                                 .duration(700)
                                 .repeat(0)
                                 .playOn(findViewById(R.id.pause));
-                        myAudioManager.abandonAudioFocus(audioFocusChangeListener);
+                        if(android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O){
+                            myAudioManager.abandonAudioFocusRequest(audioFocusRequest[0]);
+                        }
+                         else myAudioManager.abandonAudioFocus(audioFocusChangeListener);
                     }else  {
                         Toast.makeText(getApplicationContext(),"no song is playing", Toast.LENGTH_SHORT).show();
                     }
@@ -98,7 +140,12 @@ public class MainActivity extends AppCompatActivity {
             Button stopButton = findViewById(R.id.stop);
 
             //using a OnClickListener to stop the music player and release its resources.
-            stopButton.setOnClickListener(new View.OnClickListener() {
+           /*
+                     STOP
+                     STOP
+            */
+            stopButton.setOnClickListener(new View.OnClickListener()
+            {
                 @Override
                 public void onClick(View v) {
                     if (music != null && music.isPlaying()) { //If music is playing already
@@ -107,7 +154,10 @@ public class MainActivity extends AppCompatActivity {
                                 .duration(700)
                                 .repeat(0)
                                 .playOn(findViewById(R.id.stop));
-                       myAudioManager.abandonAudioFocus(audioFocusChangeListener);
+                        if(android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O){
+                            myAudioManager.abandonAudioFocusRequest(audioFocusRequest[0]);
+                        }
+                        else myAudioManager.abandonAudioFocus(audioFocusChangeListener);
                         music = MediaPlayer.create(getApplicationContext(), R.raw.song);
                         Log.i("musicPlayer", "audio focus abandoned");
                         Log.i("musicPlayer", "called the stop player code inside the stop button code.");
@@ -140,7 +190,11 @@ public class MainActivity extends AppCompatActivity {
             // setting the media player to null is an easy way to tell that the media player.
             // is not configured to play an audio file at the moment.
             music = null;
-            myAudioManager.abandonAudioFocus(audioFocusChangeListener);
+
+            if(android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O){
+                myAudioManager.abandonAudioFocusRequest(audioFocusRequest[0]);
+            }
+            else  myAudioManager.abandonAudioFocus(audioFocusChangeListener);
             Log.i("music player","the music player focus is abandoned");
         }
     }
